@@ -52,10 +52,11 @@ classifier_prompt = PromptTemplate.from_template("""
 Classify this user message into one of the following intents:
 - issue (for physical property issues)
 - faq (for rental agreements, tenancy laws, deposits, etc.)
+- gratitude (for thank you messages)
 
 Message: {text}
 
-Respond with only one word: issue or faq
+Respond with only one word: issue, faq, or gratitude
 """)
 intent_classifier = classifier_prompt | ChatOpenAI(temperature=0, model="gpt-4", openai_api_key=openai_api_key)
 
@@ -68,6 +69,9 @@ def route_request(image_path=None, text=None, location=None):
 
     if text:
         intent = classify_intent(text)
+
+        if intent == "gratitude":
+            return "You're welcome! Feel free to ask if you have any other questions about your property."
 
         if intent == "issue":
             result = agent1_chain.invoke({
@@ -101,12 +105,26 @@ st.set_page_config(page_title="🏡 Realtaa – Your Assistant for Property", la
 
 st.title("🏡 Realtaa – Your Assistant for Property")
 
-# Session state for messages
+# Session state for messages and image
 if "messages" not in st.session_state:
     st.session_state.messages = []
+if "user_image" not in st.session_state:
+    st.session_state.user_image = None
+if "image_path" not in st.session_state:
+    st.session_state.image_path = None
 
 # File uploader
-user_image = st.file_uploader("Upload a property image (optional)")
+uploaded_image = st.file_uploader("Upload a property image (optional)", type=["jpg", "jpeg", "png"])
+if uploaded_image:
+    with st.spinner("Processing image..."):
+        # Save the uploaded file to a temporary location
+        temp_path = f"temp_{uploaded_image.name}"
+        with open(temp_path, "wb") as f:
+            f.write(uploaded_image.getvalue())
+        st.session_state.user_image = uploaded_image
+        st.session_state.image_path = temp_path
+        st.image(uploaded_image, caption="Uploaded Image", use_container_width=True)
+        st.success("Image processed successfully!")
 
 # Display message history
 for msg in st.session_state.messages:
@@ -123,14 +141,36 @@ if user_input:
         st.markdown(user_input)
 
     with st.chat_message("assistant"):
-        with st.spinner("Thinking..."):
-            if user_image:
-                with open("temp.jpg", "wb") as f:
-                    f.write(user_image.read())
-                response = route_request("temp.jpg", user_input)
+        with st.spinner("Analyzing your request..."):
+            if st.session_state.image_path:
+                response = route_request(st.session_state.image_path, user_input)
             else:
                 response = route_request(text=user_input)
             st.markdown(response)
 
     # Save assistant response
     st.session_state.messages.append({"role": "assistant", "content": response})
+
+# Add custom CSS for better loading indicators
+st.markdown("""
+    <style>
+    .stSpinner > div {
+        background-color: #4CAF50;
+        border-radius: 10px;
+        padding: 10px;
+        color: white;
+    }
+    .stSuccess {
+        background-color: #4CAF50;
+        color: white;
+        padding: 10px;
+        border-radius: 10px;
+        margin: 10px 0;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# Clean up temporary files when session ends
+if st.session_state.image_path and os.path.exists(st.session_state.image_path):
+    os.remove(st.session_state.image_path)
+    st.session_state.image_path = None
