@@ -26,12 +26,23 @@ def generate_caption(image_path):
 # Agent 1: Issue Detection
 agent1_prompt = PromptTemplate.from_template("""
 You're a property issue expert. Given the following image description and user context,
-identify the issue and suggest fixes.
+analyze the issue and provide specific details.
 
 Image says: {image_caption}
 User says: {user_text}
 
-Respond with analysis and suggestions.
+If the user is asking about counting or identifying specific elements (like cracks, stains, etc.):
+1. First, acknowledge that you're working from an image description
+2. If the image description provides specific counts or details, share those
+3. If the image description is general, explain what you can determine from it
+4. Suggest how to get more accurate information (e.g., closer inspection, professional assessment)
+
+For other types of questions:
+- Identify the issue
+- Provide analysis
+- Suggest fixes
+
+Respond with clear, specific information based on what you can determine from the image description.
 """)
 agent1_chain = agent1_prompt | ChatOpenAI(temperature=0.5, model="gpt-4", openai_api_key=openai_api_key)
 
@@ -74,6 +85,9 @@ def route_request(image_path=None, text=None, location=None):
             return "You're welcome! Feel free to ask if you have any other questions about your property."
 
         if intent == "issue":
+            # For testing: Show the raw BLIP caption
+            st.write("BLIP Image Description:", caption)
+            
             result = agent1_chain.invoke({
                 "image_caption": caption or "No image provided.",
                 "user_text": text
@@ -91,6 +105,9 @@ def route_request(image_path=None, text=None, location=None):
             return result.content if hasattr(result, "content") else str(result)
 
     elif image_path:
+        # For testing: Show the raw BLIP caption
+        st.write("BLIP Image Description:", caption)
+        
         result = agent1_chain.invoke({
             "image_caption": caption,
             "user_text": ""
@@ -127,9 +144,23 @@ if uploaded_image:
         st.success("Image processed successfully!")
 
 # Display message history
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+if not st.session_state.messages:
+    st.markdown("""
+    <div style='text-align: center; padding: 20px;'>
+        <h3>👋 Welcome to Realtaa!</h3>
+        <p>I'm your property assistant. You can:</p>
+        <ul style='list-style-type: none; padding: 0;'>
+            <li>📸 Upload an image of a property issue</li>
+            <li>💬 Ask questions about property maintenance</li>
+            <li>📚 Get information about tenancy laws</li>
+        </ul>
+        <p>How can I help you today?</p>
+    </div>
+    """, unsafe_allow_html=True)
+else:
+    for msg in st.session_state.messages:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
 
 # Chat input box
 user_input = st.chat_input("Ask a question or describe the issue...")
