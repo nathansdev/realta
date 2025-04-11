@@ -1,0 +1,32 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+
+# Environment variables
+.env
+
+# Streamlit files
+.streamlit/
+
+# Cache files
+.cache/
+*.log
+
+# macOS system files
+.DS_Store
+
+# VSCode settings (optional)
+.vscode/
+
+# Python packaging
+*.egg-info/
+dist/
+build/
+
+# Hugging Face & Torch model cache
+~/.cache/huggingface
+~/.cache/torch

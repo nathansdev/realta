@@ -1,0 +1,9 @@
+streamlit
+langchain
+langchain-community
+openai
+torch
+transformers
+pillow
+python-dotenv
+watchdog
