@@ -87,6 +87,12 @@ def classify_intent(text):
     result = intent_classifier.invoke({"text": text})
     return result.content.strip().lower()
 
+def clear_chat_state():
+    """Helper function to clear all chat-related state"""
+    st.session_state.messages = []
+    st.session_state.image_path = None
+    st.session_state.user_image = None
+
 def route_request(image_path=None, text=None, location=None):
     caption = generate_caption(image_path) if image_path else None
 
@@ -95,26 +101,42 @@ def route_request(image_path=None, text=None, location=None):
 
         # Check if the question might be better suited for the other agent
         if st.session_state.selected_agent == "faq" and intent == "issue":
-            st.markdown("It seems like you're asking about a property issue. This would be better handled by our Issue Detection Agent.")
+            message = "It seems like you're asking about a property issue. This would be better handled by our Issue Detection Agent."
+            st.markdown(message)
             st.markdown("Would you like to switch to the Issue Detection Agent?")
             if st.button("Switch to Issue Detection Agent", use_container_width=True):
+                # Store the current question
+                current_question = text
+                current_location = location
+                # Clear everything
                 st.session_state.messages = []
                 st.session_state.image_path = None
                 st.session_state.user_image = None
                 st.session_state.selected_agent = "issue"
+                # Add the switch message to history
+                st.session_state.messages.append({"role": "user", "content": current_question})
+                st.session_state.messages.append({"role": "assistant", "content": message})
                 st.rerun()
-            return ""
+            return message
 
         if st.session_state.selected_agent == "issue" and intent == "faq":
-            st.markdown("It seems like you're asking about tenancy or legal matters. This would be better handled by our Tenancy FAQ Agent.")
+            message = "It seems like you're asking about tenancy or legal matters. This would be better handled by our Tenancy FAQ Agent."
+            st.markdown(message)
             st.markdown("Would you like to switch to the Tenancy FAQ Agent?")
             if st.button("Switch to Tenancy FAQ Agent", use_container_width=True):
+                # Store the current question
+                current_question = text
+                current_location = location
+                # Clear everything
                 st.session_state.messages = []
                 st.session_state.image_path = None
                 st.session_state.user_image = None
                 st.session_state.selected_agent = "faq"
+                # Add the switch message to history
+                st.session_state.messages.append({"role": "user", "content": current_question})
+                st.session_state.messages.append({"role": "assistant", "content": message})
                 st.rerun()
-            return ""
+            return message
 
         if intent == "gratitude":
             return "You're welcome! Feel free to ask if you have any other questions about your property."
@@ -285,18 +307,18 @@ else:
 
     # Display message history
     if not st.session_state.messages:
-        st.markdown("""
-        <div style='text-align: center; padding: 20px;'>
-            <h3>👋 Welcome to Realtaa!</h3>
-            <p>I'm your property assistant. You can:</p>
-            <ul style='list-style-type: none; padding: 0;'>
-                <li>📸 Upload an image of a property issue</li>
-                <li>💬 Ask questions about property maintenance</li>
-                <li>📚 Get information about tenancy laws</li>
-            </ul>
-            <p>How can I help you today?</p>
-        </div>
-        """, unsafe_allow_html=True)
+        if st.session_state.selected_agent == "issue" and st.session_state.image_path is None:
+            st.markdown("""
+            <div style='text-align: center; padding: 20px;'>
+                <p>Please upload an image of the issue you're facing and describe the issue.</p>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown("""
+            <div style='text-align: center; padding: 20px;'>
+                <p>Ask me anything about tenancy laws, contracts and issues.</p>
+            </div>
+            """, unsafe_allow_html=True)
     else:
         for msg in st.session_state.messages:
             with st.chat_message(msg["role"]):
@@ -344,3 +366,17 @@ st.markdown("""
 }
 </style>
 """, unsafe_allow_html=True)
+
+# In the main UI code, after agent selection:
+if "pending_question" in st.session_state and st.session_state.pending_question:
+    # Re-ask the pending question after switching
+    question = st.session_state.pending_question
+    location = st.session_state.pending_location
+    # Clear pending question
+    st.session_state.pending_question = None
+    st.session_state.pending_location = None
+    # Process the question with the new agent
+    response = route_request(text=question, location=location)
+    if response:
+        st.session_state.messages.append({"role": "user", "content": question})
+        st.session_state.messages.append({"role": "assistant", "content": response})
